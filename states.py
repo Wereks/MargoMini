@@ -3,13 +3,14 @@ from enum import Enum
 class State(Enum):
     NOT_LOGGED = 0,
     LOGGED_IN = 1,
-    INIT = 2, 
-    ACTIVE = 3,
+    START_INIT, INIT = 2, 3 
+    ACTIVE = 4,
 
 PAYLOAD = {
-    State.ACTIVE: {'aid', 'mobile', 'ev', 'mobile_token'},
-    State.INIT : {'aid', 'mobile', 'mobile_token'},
-    State.LOGGED_IN: {'aid', 'mobile'},
+    State.ACTIVE: {'mobile', 'ev', 'mobile_token', 'mucka'},
+    State.INIT : {'mobile', 'mobile_token', 'mucka'},
+    State.START_INIT : {'mobile', 'mucka'},
+    State.LOGGED_IN: {},
     State.NOT_LOGGED: {},
 }
 
