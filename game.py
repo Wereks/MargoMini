@@ -1,12 +1,18 @@
 from hashlib import md5, sha1
 from json.decoder import JSONDecodeError
 from random import random
+from enum import Enum
 
 from asks import Session
 from asks.cookie_utils import Cookie
 import trio
 
 from states import State, state, init_state, PAYLOAD
+
+class RequestType(Enum):
+    EVENT = 0,
+    NORMAL = 1,
+
 
 class GameSession(Session):
     def __init__(self):
@@ -64,8 +70,8 @@ class GameSession(Session):
 
         
 
-    async def query_game(self, params={}):
-        payload = params | self._get_default_payload()
+    async def query_game(self, data={}):
+        payload = data | self._get_default_payload()
 
         response = await self._send(payload)
         self.cookies.update({c.name:c.value for c in response.cookies})
@@ -89,6 +95,7 @@ class Game():
         init_state(State.NOT_LOGGED)
 
         self.session = GameSession()
+        #self.gui = GUI()
         self.container = {}
 
     async def log_in(self, login: str, password: str):
@@ -118,21 +125,48 @@ class Game():
             await _init(1)
 
             state(State.INIT)
-            for lvl in range(2,5)
+            for lvl in range(2,5):
                 await _init(lvl)
 
             state(State.ACTIVE)
-            self.keep_alive()
+            await self.active_init()
 
-    async def keep_alive(self):
-        pass
 
+    async def active_init(self):
+        send_request, receive_response = trio.open_memory_channel(0)
+        async with trio.open_nursery() as nursery:
+            async with send_request, receive_response:
+                nursery.start_soon(self.keep_alive, send_request.clone())
+                nursery.start_soon(self.wait_for_input, send_request.clone())
+                nursery.start_soon(self.parse_request, receive_response.clone())
+
+    async def wait_for_input(self, send_requests):
+        async with send_requests:
+            while state() == State.ACTIVE:
+                #input = self.gui.wait_for_input()
+                input = None
+                response = 'Normal'
+                #response = await self.parse_command(input)
+                await send_requests.send((RequestType.NORMAL, response))
+                await trio.sleep(5)
+
+    async def keep_alive(self, send_requests):
+        async with send_requests:
+            while state() == State.ACTIVE:
+                response = await self.session.query_game()
+                await send_requests.send((RequestType.EVENT, response))
+                await trio.sleep(0.5)
+
+    async def parse_request(self, receive_response):
+        with receive_response:
+            async for (type_, response) in receive_response:
+                print(response)
 
 
 async def main():
     game = Game()
     await game.log_in('', '')
-    #await game.get_player_data()
+    #print(await game.get_player_data())
     await game.init('', '')
 
 trio.run(main)   
